@@ -395,7 +395,7 @@ exit
 ```
 
 # Thank You!
-Building and learning with Chainlink! Inspired by [smartcontractkit](https://github.com/smartcontractkit/hardhat-starter-kit)
+Building and learning with Chainlink! Inspired by [smartcontractkit](https://github.com/smartcontractkit/hardhat-starter-kit) ❤️
 
 ## Resources
 
