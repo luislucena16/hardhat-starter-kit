@@ -1,40 +1,65 @@
-const { networkConfig, autoFundCheck, developmentChains } = require('../../helper-hardhat-config')
-const skipIf = require('mocha-skip-if')
-const chai = require('chai')
-const { expect } = require('chai')
-const BN = require('bn.js')
-const { getChainId } = require('hardhat')
-chai.use(require('chai-bn')(BN))
+const { assert, expect } = require("chai")
+const { network, deployments, ethers } = require("hardhat")
+const { developmentChains } = require("../../helper-hardhat-config")
+const { numToBytes32 } = require("@chainlink/test-helpers/dist/src/helpers")
 
-skip.if(!developmentChains.includes(network.name)).
-  describe('APIConsumer Unit Tests', async function () {
+!developmentChains.includes(network.name)
+  ? describe.skip
+  : describe("APIConsumer Unit Tests", async function () {
+      let apiConsumer, linkToken, mockOracle
 
-    let apiConsumer, linkToken
+      beforeEach(async () => {
+        const chainId = network.config.chainId
+        await deployments.fixture(["mocks", "api"])
+        linkToken = await ethers.getContract("LinkToken")
+        linkTokenAddress = linkToken.address
+        additionalMessage = ` --linkaddress  ${linkTokenAddress}`
+        apiConsumer = await ethers.getContract("APIConsumer")
+        mockOracle = await ethers.getContract("MockOracle")
 
-    beforeEach(async () => {
-      const chainId = await getChainId()
-      await deployments.fixture(['mocks', 'api'])
-      const LinkToken = await deployments.get('LinkToken')
-      linkToken = await ethers.getContractAt('LinkToken', LinkToken.address)
-      const networkName = networkConfig[chainId]['name']
-
-      linkTokenAddress = linkToken.address
-      additionalMessage = " --linkaddress " + linkTokenAddress
-
-      const APIConsumer = await deployments.get('APIConsumer')
-      apiConsumer = await ethers.getContractAt('APIConsumer', APIConsumer.address)
-
-      if (await autoFundCheck(apiConsumer.address, networkName, linkTokenAddress, additionalMessage)) {
         await hre.run("fund-link", { contract: apiConsumer.address, linkaddress: linkTokenAddress })
-      }
-    })
+      })
 
-    it('Should successfully make an API request', async () => {
-      const transaction = await apiConsumer.requestVolumeData()
-      const tx_receipt = await transaction.wait()
-      const requestId = tx_receipt.events[0].topics[1]
+      it("Should successfully make an API request", async () => {
+        const transaction = await apiConsumer.requestVolumeData()
+        const transactionReceipt = await transaction.wait(1)
+        const requestId = transactionReceipt.events[0].topics[1]
+        console.log("requestId: ", requestId)
+        expect(requestId).to.not.be.null
+      })
 
-      console.log("requestId: ", requestId)
-      expect(requestId).to.not.be.null
+      it("Should successfully make an API request and get a result", async () => {
+        const transaction = await apiConsumer.requestVolumeData()
+        const transactionReceipt = await transaction.wait(1)
+        const requestId = transactionReceipt.events[0].topics[1]
+        const callbackValue = 777
+        await mockOracle.fulfillOracleRequest(requestId, numToBytes32(callbackValue))
+        const volume = await apiConsumer.volume()
+        assert.equal(volume.toString(), callbackValue.toString())
+      })
+
+      it("Our event should successfully fire event on callback", async () => {
+        const callbackValue = 777
+        // we setup a promise so we can wait for our callback from the `once` function
+        await new Promise(async (resolve, reject) => {
+          // setup listener for our event
+          apiConsumer.once("DataFullfilled", async () => {
+            console.log("DataFullfilled event fired!")
+            const volume = await apiConsumer.volume()
+            // assert throws an error if it fails, so we need to wrap
+            // it in a try/catch so that the promise returns event
+            // if it fails.
+            try {
+              assert.equal(volume.toString(), callbackValue.toString())
+              resolve()
+            } catch (e) {
+              reject(e)
+            }
+          })
+          const transaction = await apiConsumer.requestVolumeData()
+          const transactionReceipt = await transaction.wait(1)
+          const requestId = transactionReceipt.events[0].topics[1]
+          await mockOracle.fulfillOracleRequest(requestId, numToBytes32(callbackValue))
+        })
+      })
     })
-  })
