@@ -12,7 +12,6 @@
 - [Getting Started](#getting-started)
   - [Requirements](#requirements)
   - [Quickstart](#quickstart)
-    - [Typescript](#typescript)
 - [Usage](#usage)
   - [Deploying Contracts](#deploying-contracts)
   - [Run a Local Network](#run-a-local-network)
@@ -396,7 +395,7 @@ exit
 ```
 
 # Thank You!
-Building and learning with Chainlink!
+Building and learning with Chainlink! Inspired by [smartcontractkit](https://github.com/smartcontractkit/hardhat-starter-kit)
 
 ## Resources
 
